@@ -1,0 +1,260 @@
+﻿<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Real Madrid Tactics Pro</title>
+    <script src="https://cdn.jsdelivr.net/npm/interactjs/dist/interact.min.js"></script>
+    <style>
+        :root { --pitch-color: #3a834a; --line-color: #ffffff; --rm-blue: #00529f; }
+        body { font-family: 'Segoe UI', sans-serif; margin: 0; display: flex; height: 100vh; background: #1a1a1a; color: #eee; overflow: hidden; }
+        #sidebar { width: 320px; border-right: 1px solid #444; display: flex; flex-direction: column; background: #222; z-index: 100; overflow-y: auto; }
+        @media (max-width: 900px) { body { flex-direction: column; overflow-y: auto; height: auto; } #sidebar { width: 100%; border-right: none; border-bottom: 1px solid #444; } }
+        .sidebar-section { padding: 15px; border-bottom: 1px solid #333; }
+        h3 { margin: 0 0 10px 0; font-size: 11px; text-transform: uppercase; color: #888; }
+        input[type="text"], input[type="file"] { width: 100%; padding: 10px; background: #333; border: 1px solid #444; color: #fff; border-radius: 4px; box-sizing: border-box; margin-bottom: 8px; font-size: 14px; }
+        .fetch-btn { width: 100%; padding: 12px; background: var(--rm-blue); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .presets-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-top: 5px; }
+        .preset-btn { font-size: 10px; background: #333; color: #ccc; border: 1px solid #444; padding: 8px; border-radius: 4px; cursor: pointer; text-align: center; }
+        .settings-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+        input[type="color"] { border: none; width: 35px; height: 35px; cursor: pointer; background: none; }
+        #player-list { padding: 10px; background: #1a1a1a; }
+        .player-item { display: flex; align-items: center; padding: 10px; background: #2a2a2a; margin-bottom: 5px; border-radius: 6px; font-size: 13px; cursor: pointer; }
+        .player-item img { width: 40px; height: 40px; border-radius: 50%; margin-right: 10px; object-fit: cover; }
+        #main { flex-grow: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #111; touch-action: none; position: relative; }
+        .top-bar { margin: 15px 0; display: flex; gap: 8px; z-index: 50; justify-content: center; width: 100%; flex-wrap: wrap; }
+        .action-btn { padding: 8px 12px; border-radius: 20px; border: none; cursor: pointer; font-weight: bold; background: #333; color: white; font-size: 11px; }
+        #capture-area { display: flex; align-items: center; gap: 20px; padding: 20px; background: #111; }
+        #team-title-vertical { writing-mode: vertical-rl; transform: rotate(180deg); font-size: 42px; font-weight: 900; color: rgba(255,255,255,0.1); text-transform: uppercase; white-space: nowrap; pointer-events: none; }
+        #pitch { width: 550px; height: 740px; background-color: var(--pitch-color); border: 4px solid var(--line-color); position: relative; border-radius: 4px; }
+        @media (max-width: 600px) { #pitch { width: 340px; height: 460px; } #team-title-vertical { font-size: 28px; } #capture-area { gap: 10px; } }
+        #subs-bench { display: flex; flex-direction: column; gap: 8px; padding: 10px; background: rgba(255,255,255,0.03); border-radius: 12px; border: 1px solid rgba(255,255,255,0.05); min-height: 500px; }
+        .draggable-player { position: absolute; width: 85px; text-align: center; cursor: move; z-index: 10; touch-action: none; }
+        .circle-container { position: relative; width: 82px; height: 82px; margin: 0 auto; }
+        .circle { width: 82px; height: 82px; background: #222; border: 3px solid #fff; border-radius: 50%; overflow: hidden; position: relative; display: flex; align-items: center; justify-content: center; }
+        @media (max-width: 600px) { .draggable-player { width: 65px; } .circle-container, .circle { width: 60px; height: 60px; } }
+        .circle.selected { border-color: #007bff; box-shadow: 0 0 15px #007bff; }
+        .circle img { width: 100%; height: 100%; object-fit: cover; object-position: top; display: none; }
+        .circle img.loaded { display: block; }
+        .p-number-tag { position: absolute; top: -2px; right: -2px; background: var(--rm-blue); color: white; font-size: 11px; font-weight: bold; min-width: 20px; height: 20px; border-radius: 50%; border: 1.5px solid #fff; display: flex; align-items: center; justify-content: center; z-index: 15; }
+        .p-label { background: rgba(0,0,0,0.8); color: #fff; font-size: 10px; padding: 2px 4px; border-radius: 4px; margin-top: 8px; display: block; width: 100%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .sub-player { position: static !important; width: 60px !important; margin-bottom: 5px; }
+        .sub-player .circle-container, .sub-player .circle { width: 50px !important; height: 50px !important; }
+        .line { position: absolute; border: 2px solid var(--line-color); box-sizing: border-box; pointer-events: none; }
+        .mid-line { top: 50%; width: 100%; border-bottom: 2px solid var(--line-color); transform: translateY(-50%); }
+        .mid-circle { top: 50%; left: 50%; width: 120px; height: 120px; border-radius: 50%; transform: translate(-50%, -50%); }
+    </style>
+</head>
+<body>
+
+
+<div id="sidebar">
+    <div class="sidebar-section">
+        <h3>Команда</h3>
+        <input type="text" placeholder="Название..." oninput="document.getElementById('team-title-vertical').innerText = this.value">
+    </div>
+
+
+    <div class="sidebar-section">
+        <h3>Цвета</h3>
+        <div class="settings-row"><span>Поле</span><input type="color" value="#3a834a" oninput="document.documentElement.style.setProperty('--pitch-color', this.value)"></div>
+        <div class="settings-row"><span>Линии</span><input type="color" value="#ffffff" oninput="document.documentElement.style.setProperty('--line-color', this.value)"></div>
+    </div>
+
+
+    <div class="sidebar-section">
+        <h3>Быстрый выбор</h3>
+        <div class="presets-grid">
+            <div class="preset-btn" onclick="quickLoad('https://www.realmadrid.com/es-ES/futbol/primer-equipo-masculino/plantilla')">Основная</div>
+            <div class="preset-btn" onclick="quickLoad('https://www.realmadrid.com/es-ES/futbol/cantera-masculina/castilla')">RM Castilla</div>
+            <div class="preset-btn" onclick="quickLoad('https://www.realmadrid.com/es-ES/futbol/cantera-masculina/realmadrid-c')">Real Madrid C</div>
+            <div class="preset-btn" onclick="quickLoad('https://www.realmadrid.com/es-ES/futbol/cantera-masculina/juvenil-a')">Juvenil A</div>
+            <div class="preset-btn" onclick="quickLoad('https://www.realmadrid.com/es-ES/futbol/cantera-masculina/juvenil-b')">Juvenil B</div>
+            <div class="preset-btn" onclick="quickLoad('https://www.realmadrid.com/es-ES/futbol/cantera-masculina/juvenil-c')">Juvenil C</div>
+        </div>
+    </div>
+    
+    <div class="sidebar-section">
+        <h3>Настройка игрока</h3>
+        <div id="upload-zone" style="display:none">
+            <span id="target-name" style="font-size:10px; display:block; margin-bottom:5px; color:#aaa"></span>
+            <input type="file" id="image-loader" accept="image/*">
+        </div>
+    </div>
+
+
+    <div class="sidebar-section">
+        <input type="text" id="url-input" placeholder="URL состава...">
+        <button id="fetch-btn" class="fetch-btn" onclick="fetchPlayers()">Загрузить состав</button>
+    </div>
+    <div id="player-list"></div>
+</div>
+
+
+<div id="main">
+    <div class="top-bar">
+        <button class="action-btn" onclick="setFormation('4-3-3')">4-3-3</button>
+        <button class="action-btn" onclick="setFormation('4-4-2')">4-4-2</button>
+        <button class="action-btn" onclick="setFormation('4-2-3-1')">4-2-3-1</button>
+        <button class="action-btn" onclick="setFormation('3-4-3')">3-4-3</button>
+        <button class="action-btn" onclick="setFormation('3-5-2')">3-5-2</button>
+        <button class="action-btn" onclick="setFormation('5-3-2')">5-3-2</button>
+    </div>
+    <div id="capture-area">
+        <div id="team-title-vertical">REAL MADRID</div>
+        <div id="pitch">
+            <div class="line mid-line"></div>
+            <div class="line mid-circle"></div>
+        </div>
+        <div id="subs-bench">
+            <div style="font-size:8px; color:#666; text-align:center; font-weight:bold">SUBS</div>
+        </div>
+    </div>
+</div>
+
+
+<script>
+    // --- ЗАМЕНИТЕ ССЫЛКУ НИЖЕ НА ВАШУ ИЗ RENDER ---
+    const SERVER_URL = 'https://castilla.onrender.com'; 
+    // ----------------------------------------------
+
+
+    let selectedSlot = null;
+
+
+    function quickLoad(url) { document.getElementById('url-input').value = url; fetchPlayers(); }
+
+
+    async function fetchPlayers() {
+        const url = document.getElementById('url-input').value;
+        const btn = document.getElementById('fetch-btn');
+        const listDiv = document.getElementById('player-list');
+        
+        btn.innerText = 'Загрузка (пробуждаю сервер)...';
+        listDiv.innerHTML = '';
+
+
+        try {
+            const response = await fetch(`${SERVER_URL}/api/scrape?url=${encodeURIComponent(url)}`);
+            const players = await response.json();
+            btn.innerText = 'Загрузить состав';
+            listDiv.innerHTML = players.map(p => `
+                <div class="player-item" onclick="selectFromList('${p.name}', '${p.img}', '${p.number}')">
+                    <img src="${p.img}" crossorigin="anonymous">
+                    <span>#${p.number || ''} ${p.name}</span>
+                </div>
+            `).join('');
+        } catch (e) { 
+            btn.innerText = 'Ошибка загрузки';
+            listDiv.innerHTML = '<p style="color:red; font-size:12px">Не удалось связаться с сервером. Проверьте ссылку в коде.</p>';
+        }
+    }
+
+
+    function initBoard() {
+        const pitch = document.getElementById('pitch');
+        const bench = document.getElementById('subs-bench');
+        for (let i = 0; i < 11; i++) createPlayer(pitch, 'pos-' + i, false);
+        for (let i = 0; i < 8; i++) createPlayer(bench, 'sub-' + i, true);
+        setFormation('4-3-3');
+    }
+
+
+    function createPlayer(container, id, isSub) {
+        const p = document.createElement('div');
+        p.className = 'draggable-player' + (isSub ? ' sub-player' : '');
+        p.id = id;
+        p.innerHTML = `<div class="circle-container"><div class="p-number-tag" contenteditable="true">?</div><div class="circle" onclick="clickSlot(this)"><img src="" crossorigin="anonymous"></div></div><div class="p-label" contenteditable="true">Игрок</div>`;
+        container.appendChild(p);
+    }
+
+
+    function clickSlot(el) {
+        document.querySelectorAll('.circle').forEach(c => c.classList.remove('selected'));
+        el.classList.add('selected');
+        selectedSlot = el.closest('.draggable-player');
+        document.getElementById('upload-zone').style.display = 'block';
+        document.getElementById('target-name').innerText = "Меняем фото для: " + selectedSlot.querySelector('.p-label').innerText;
+    }
+
+
+    document.getElementById('image-loader').onchange = function(e) {
+        if (e.target.files[0] && selectedSlot) {
+            const reader = new FileReader();
+            reader.onload = (ev) => { 
+                const img = selectedSlot.querySelector('img'); 
+                img.src = ev.target.result; 
+                img.classList.add('loaded'); 
+            };
+            reader.readAsDataURL(e.target.files[0]);
+        }
+    };
+
+
+    function selectFromList(name, img, number) {
+        if (!selectedSlot) return;
+        updatePlayerData(selectedSlot, name, img, number);
+        selectedSlot.querySelector('.circle').classList.remove('selected');
+    }
+
+
+    function updatePlayerData(el, name, img, num) {
+        const imgEl = el.querySelector('img');
+        if (img) { imgEl.src = img; imgEl.onload = () => imgEl.classList.add('loaded'); }
+        el.querySelector('.p-number-tag').innerText = num || '?';
+        el.querySelector('.p-label').innerText = name;
+    }
+
+
+    function setFormation(f) {
+        const coords = {
+            '4-3-3': [{t:90,l:50},{t:75,l:15},{t:78,l:35},{t:78,l:65},{t:75,l:85},{t:55,l:25},{t:58,l:50},{t:55,l:75},{t:25,l:20},{t:18,l:50},{t:25,l:80}],
+            '4-4-2': [{t:90,l:50},{t:75,l:15},{t:78,l:35},{t:78,l:65},{t:75,l:85},{t:52,l:15},{t:52,l:38},{t:52,l:62},{t:52,l:85},{t:22,l:35},{t:22,l:65}],
+            '4-2-3-1': [{t:90,l:50},{t:75,l:15},{t:78,l:35},{t:78,l:65},{t:75,l:85},{t:60,l:35},{t:60,l:65},{t:35,l:20},{t:32,l:50},{t:35,l:80},{t:15,l:50}],
+            '3-4-3': [{t:90,l:50},{t:72,l:25},{t:74,l:50},{t:72,l:75},{t:50,l:12},{t:48,l:38},{t:48,l:62},{t:50,l:88},{t:22,l:20},{t:15,l:50},{t:22,l:80}],
+            '3-5-2': [{t:90,l:50},{t:72,l:25},{t:74,l:50},{t:72,l:75},{t:52,l:12},{t:50,l:30},{t:48,l:50},{t:50,l:70},{t:52,l:88},{t:20,l:35},{t:20,l:65}],
+            '5-3-2': [{t:90,l:50},{t:70,l:12},{t:72,l:30},{t:74,l:50},{t:72,l:70},{t:70,l:88},{t:48,l:25},{t:50,l:50},{t:48,l:75},{t:20,l:35},{t:20,l:65}]
+        };
+        coords[f].forEach((pos, i) => {
+            const el = document.getElementById('pos-' + i);
+            el.style.top = pos.t + '%'; el.style.left = pos.l + '%';
+            el.style.transform = 'translate(-50%, -50%)';
+            el.setAttribute('data-x', 0); el.setAttribute('data-y', 0);
+        });
+    }
+
+
+    interact('.draggable-player').draggable({
+        onmove(event) {
+            const t = event.target;
+            const x = (parseFloat(t.getAttribute('data-x')) || 0) + event.dx;
+            const y = (parseFloat(t.getAttribute('data-y')) || 0) + event.dy;
+            const isSub = t.classList.contains('sub-player');
+            t.style.transform = `translate(calc(${isSub ? '0%' : '-50%'} + ${x}px), calc(${isSub ? '0%' : '-50%'} + ${y}px))`;
+            t.setAttribute('data-x', x); t.setAttribute('data-y', y);
+        },
+        onend(event) {
+            const t = event.target;
+            const rect = t.getBoundingClientRect();
+            document.querySelectorAll('.draggable-player').forEach(target => {
+                if (target === t) return;
+                const tr = target.getBoundingClientRect();
+                if (rect.left < tr.right && rect.right > tr.left && rect.top < tr.bottom && rect.bottom > tr.top) {
+                    const dN = t.querySelector('.p-label').innerText, dI = t.querySelector('img').src, dL = t.querySelector('img').classList.contains('loaded'), dNum = t.querySelector('.p-number-tag').innerText;
+                    const tN = target.querySelector('.p-label').innerText, tI = target.querySelector('img').src, tL = target.querySelector('img').classList.contains('loaded'), tNum = target.querySelector('.p-number-tag').innerText;
+                    updatePlayerData(t, tN, tL ? tI : null, tNum);
+                    updatePlayerData(target, dN, dL ? dI : null, dNum);
+                    if(!tL) t.querySelector('img').classList.remove('loaded');
+                    if(!dL) target.querySelector('img').classList.remove('loaded');
+                    t.style.transform = t.classList.contains('sub-player') ? '' : 'translate(-50%, -50%)';
+                    t.setAttribute('data-x', 0); t.setAttribute('data-y', 0);
+                }
+            });
+        }
+    });
+
+
+    initBoard();
+</script>
+</body>
+</html>
